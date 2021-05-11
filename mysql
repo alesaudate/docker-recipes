@@ -1,4 +1,21 @@
 #!/bin/bash
 
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-docker-compose -f $SCRIPT_DIR/docker-compose-mysql.yaml up -d
+#SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+DB_EXISTS=$(docker ps -a | grep mysql)
+
+if [ -z "$DB_EXISTS" ]; then
+	echo "Please type in the database name:"
+	read DATABASE
+
+	echo "Please type in the user name:"
+	read USERNAME
+
+	echo "Please type in the user password:"
+	read USER_PASSWD
+
+	docker run -d -e MYSQL_DATABASE=$DATABASE -e MYSQL_USER=$USERNAME -e MYSQL_PASSWORD=$USER_PASSWD -e MYSQL_RANDOM_ROOT_PASSWORD=true -p 3306:3306 --name mysql mysql:5.7
+else
+	docker start mysql
+fi
+
