@@ -1,0 +1,11 @@
+#!/bin/bash
+
+#xhost +"local:docker@"
+
+SQL_DEVELOPER_EXISTS=$(docker ps -a | grep sqldeveloper)
+if [ -z "$SQL_DEVELOPER_EXISTS" ]; then
+	xhost +local:root
+	docker run -d --rm -e DISPLAY=$DISPLAY --net=host -v /tmp/.X11-unix:/tmp/.X11-unix:rw --name sqldeveloper marcelhuberfoo/sqldeveloper
+else
+	docker start sqldeveloper
+fi

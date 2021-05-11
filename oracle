@@ -5,7 +5,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 TARGET_FOLDER=$SCRIPT_DIR/oracle-docker-images
 CURRENT_DIR=$(pwd)
 
-
+FINAL_PASSWORD=$1
 
 install_command() {
 
@@ -79,10 +79,14 @@ while [ -z "$DB_READY" ]; do
 	sleep 5
 done
 
+if [ ! -z "$FINAL_PASSWORD" ]; then
+	docker exec oracledb ./setPassword.sh $FINAL_PASSWORD
+	ORACLE_SYSTEM_PASSWORD=$FINAL_PASSWORD
+fi
 
 echo "Done. Use the following data to connect:"
 echo "Host: localhost"
-echo "SID: ORCLPDB1"
+echo "Service name: ORCLPDB1"
 echo "Port: 1521"
 echo "User: SYSTEM"
 echo "Password: $ORACLE_SYSTEM_PASSWORD"
