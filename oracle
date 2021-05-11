@@ -1,0 +1,87 @@
+#!/bin/bash
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+
+TARGET_FOLDER=$SCRIPT_DIR/oracle-docker-images
+CURRENT_DIR=$(pwd)
+
+
+
+install_command() {
+
+	local command_to_install=$1
+	if [ ! command -v $command_to_install &> /dev/null ]; then
+		echo "I need to install $command_to_install to proceed"
+		sudo apt-get install -y $command_to_install
+	fi
+}
+
+if [ ! command -v docker &> /dev/null ]; then
+	echo "Before running this script, make sure you have docker installed and that you are able to run in as a regular user"
+	exit 1
+fi
+
+IMAGE_EXISTS=$(docker images | grep oracle\/database)
+
+if [ -z "$IMAGE_EXISTS" ]; then
+
+
+	if [ ! -d "$TARGET_FOLDER/docker-images-main" ]; then
+		echo "Downloading official docker image"
+		mkdir -p $TARGET_FOLDER
+		install_command wget
+		wget -q --show-progress -O $TARGET_FOLDER/main.zip https://github.com/oracle/docker-images/archive/refs/heads/main.zip
+	
+		install_command unzip
+		unzip -q $TARGET_FOLDER/main.zip -d $TARGET_FOLDER
+	fi
+
+	while [ ! -f "$TARGET_FOLDER/LINUX.X64_193000_db_home.zip" ]; do
+
+		echo "Please open https://www.oracle.com/database/technologies/oracle-database-software-downloads.html and download Oracle Database 19.3 for Linux x86-64."
+        	echo "When done, place it on $TARGET_FOLDER"
+		echo "Then come back and hit [ENTER]"
+		read db
+	done
+
+	echo "Processing file, please wait"
+	cp $TARGET_FOLDER/LINUX.X64_193000_db_home.zip $TARGET_FOLDER/docker-images-main/OracleDatabase/SingleInstance/dockerfiles/19.3.0
+
+	cd $TARGET_FOLDER/docker-images-main/OracleDatabase/SingleInstance/dockerfiles
+	./buildContainerImage.sh -v 19.3.0 -s
+	cd $CURRENT_DIR
+fi
+
+DB_EXISTS=$(docker ps -a | grep oracledb)
+
+if [ -z "$DB_EXISTS" ]; then
+	echo "Starting up a database from scratch. Grab some coffee because this will take a while"
+	docker run --name oracledb -d -p 1521:1521 -p 5500:5500 oracle/database:19.3.0-se2
+else
+	docker start oracledb
+fi
+
+sleep 1
+ORACLE_SYSTEM_PASSWORD=$(docker logs oracledb | grep "ORACLE PASSWORD FOR" | rev | cut -d' ' -f1 | rev )
+echo "Waiting for database to be ready..."
+
+#docker logs -f oracledb
+
+unset DB_READY
+
+RND_DATA=$RANDOM
+
+while [ -z "$DB_READY" ]; do
+	SQL_PLUS_OUTPUT=$(docker exec -it -e ORACLE_SID=ORCLCDB oracledb /bin/bash -c "echo 'select $RND_DATA from dual;' | sqlplus -s SYSTEM/$ORACLE_SYSTEM_PASSWORD@localhost:1521/ORCLPDB1")	
+	DB_READY=$(echo $SQL_PLUS_OUTPUT | grep "$RND_DATA")
+	sleep 5
+done
+
+
+echo "Done. Use the following data to connect:"
+echo "Host: localhost"
+echo "SID: ORCLPDB1"
+echo "Port: 1521"
+echo "User: SYSTEM"
+echo "Password: $ORACLE_SYSTEM_PASSWORD"
+
